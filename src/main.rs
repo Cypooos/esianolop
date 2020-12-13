@@ -1,5 +1,14 @@
 use esianolop;
 
 fn main() {
-    esianolop::structs::parse_text("super  woua nice#comment\nkk woua 23");
+    let mut compiler = esianolop::structs::Esianolop{
+        values:Vec::new()
+    };
+
+    println!("{:?}",compiler.parse_text("1 2 3 + <"));
+    println!("{:?}",compiler.values);
+    compiler.values = Vec::new();
+    
+    println!("{:?}",compiler.parse_text("1 2 3 + >"));
+    println!("{:?}",compiler.values);
 }
