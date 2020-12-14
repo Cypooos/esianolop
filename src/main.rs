@@ -48,7 +48,7 @@ fn execute_command(input:Vec<&str>,compiler:&mut esianolop::structs::Esianolop) 
     match input[0] {
 
         "?" | "help" => help(), // Affichage de l'aide
-        "q" | "quit" => process::exit(1), // Quitter l'application
+        "q" | "quit" => process::exit(0), // Quitter l'application
         "r" | "reset" => compiler.values = Vec::new(), // On reset le stack
         "p" | "print" => println!("{:?} => {:?}",compiler.values,compiler.get_result()), // On affiche le stack / le stack compilé
         "e" | "exe" | "x" => { 
