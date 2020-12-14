@@ -2,8 +2,10 @@ use std::fmt;
 use std::env;
 use std::fs;
 use std::num;
+use std::collections::HashMap;
 
 
+// Définition de la liste des instructions (sans les fonctions, ni les for, ils se font à coté)
 #[derive(Clone)]
 #[derive(Debug)]
 pub enum EsianolopInstruction {
@@ -20,8 +22,10 @@ pub enum EsianolopInstruction {
     Num(usize),
 }
 
+// ajoute de "méthodes" à l'objet EsianolopInstruction
 impl EsianolopInstruction {
 
+    // La fonction execute donne le résultat. Elle est récursive car elle appelle ces/son fil(s) pour connaitre sa valeur
     pub fn execute(&self) -> usize {
         match self {
             EsianolopInstruction::Nul => {return 0},
@@ -39,11 +43,12 @@ impl EsianolopInstruction {
     }
 }
 
+// Implémentation du charactère affichage pour une instruction (similaire à classe.__str__)
+// La fonction est récursive car lors de l'affichage, il demande à afficher le(s) fil(s) au noeu.
 impl fmt::Display for EsianolopInstruction {
-    // This trait requires `fmt` with this exact signature.
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         
-        match self {
+        match self { // Selon mon type, j'affiche XXX(valeur1, valeur2 ...)
             EsianolopInstruction::Nul => {write!(f,"Nul")},
             EsianolopInstruction::Add(a,b) => {return write!(f,"Add({},{})",a,b)},
             EsianolopInstruction::Sub(a,b) => {return write!(f,"Sub({},{})",a,b)},
@@ -60,43 +65,66 @@ impl fmt::Display for EsianolopInstruction {
 }
 
 
+// Definition de la structure pour le compilateur
+// avec values    : Stack d'Arbres 
+// et   fonctions : Des bouts de codes stoqué sous des Strings
 pub struct Esianolop {
     pub values:Vec<EsianolopInstruction>,
+    pub functions:HashMap::<String,String>,
 }
 
 
+// Implémentation de "méthodes" -en rust c'est des fonction car tout est statique- pour l'objet Esianolop
 impl Esianolop {
 
+    // méthode new: retourne une nouvelle instance vide de Esianolop
     pub fn new() -> Esianolop {
         Esianolop {
             values:vec![],
+            functions:HashMap::new()
         }
     }
 
-    
+    // Execute un fichier. Retourne soit Err(message d'erreur) ou Ok(())
     pub fn parse_file(&mut self,filename:&str) -> Result<(),String> {
 
-        match fs::read_to_string(filename.to_owned()) {
-            Ok(e) => {return self.parse_text(&e)},
-            Err(e)=> {return Err(format!("Error while parsing the file: {}",e))},
+        match fs::read_to_string(filename.to_owned()) { // Est-ce que le ficher à pu etre lu ?
+
+            // Si oui, appelle de self.parse_text() avec le contenu du fichier et on retourne (car self.parse_text() à la même signiature)
+            Ok(e) => {return self.parse_text(&e)}, 
+            // Si non, on retourne une erreur
+            Err(e)=> {return Err(format!("Error while parsing the file: {}",e))}, 
         }
     }
 
+
+    // retourne le stack avec toutes les arbres calculés.
     pub fn get_result(&self) -> Vec<usize> {
         return self.values.iter().map(|x| x.execute()).collect::<Vec<usize>>()
     }
 
+
+    // Execute du code Esianolop multilignes, retourne soit Ok(()), ou Err(message d'erreur)
     pub fn parse_text(&mut self,text:&str) -> Result<(),String> {
         
+        // Pour chaque ligne
         for (line_nb,line) in text.split("\n").map(|x| x.to_owned()).enumerate() {
-            for (ins_nb, mut instruction) in line.split(";").collect::<Vec<&str>>()[0].split("#").collect::<Vec<&str>>()[0].split(" ").filter(|x| x.to_owned().trim() != "" ).enumerate() {
+
+            // Retire les commentaires du code
+            let no_comment = line.split(";").collect::<Vec<&str>>()[0].split("#").collect::<Vec<&str>>()[0];
+
+            // On énumère toutes les instructions
+            for (ins_nb, mut instruction) in no_comment.split(" ").filter(|x| x.to_owned().trim() != "" ).enumerate() {
+
+                // On test si il y a un "<" ou ">" devant
                 let mut vec_from_down = true;
                 let mut specified = false;
                 if (instruction.len() >= 2) & (instruction.chars().nth(0) == Some('<') || instruction.chars().nth(0) == Some('>')) {
                     vec_from_down = instruction.chars().nth(0) == Some('<');
                     instruction = instruction.chars().next().map(|c| &instruction[c.len_utf8()..]).unwrap();
-                    specified = true;
+                    specified = true; // Utile pour les nombres, car par défault on l'ajoute à droite du stack
                 }
+
                 match instruction.to_ascii_lowercase().as_str() {
                     "+" | "add" => {
                         match vec_from_down {
@@ -319,10 +347,9 @@ impl Esianolop {
 
                     }
                 }
-                //println!("{}:{} - {} Ok()",line_nb,ins_nb,instruction);
             }
         }
-        Ok(())
+        Ok(()) // Tout c'est bien passé, on retourne Ok(())
     }
 
 }

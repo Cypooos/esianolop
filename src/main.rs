@@ -3,6 +3,8 @@ use std::env;
 use std::io::{self, Write};
 use std::process;
 
+
+// La fonction qui affiche l'aide
 pub fn help() {
     println!(r#"Help : Esianolop v1.0b par Cyprien Bourotte
 Commandes :
@@ -39,76 +41,91 @@ Exemples :
 )
 }
 
+// Fonction qui execute du code en ligne de commande. Ne retourne rien, affiche directement
+fn execute_command(input:Vec<&str>,compiler:&mut esianolop::structs::Esianolop) {
+
+    // On regarde le permier argument
+    match input[0] {
+
+        "?" | "help" => help(), // Affichage de l'aide
+        "q" | "quit" => process::exit(1), // Quitter l'application
+        "r" | "reset" => compiler.values = Vec::new(), // On reset le stack
+        "p" | "print" => println!("{:?} => {:?}",compiler.values,compiler.get_result()), // On affiche le stack / le stack compilé
+        "e" | "exe" | "x" => { 
+            
+            // Il y a un double match ici, gloire à rust ^^
+            // Le premier retourne l'execution des arguments si ils y sont, sinon retourne une erreur
+            match match input.get(1..(input.len())) {
+
+                Some(e) => {
+                    compiler.parse_text(&e.join(" ")) // le match renvoie l'execution du code entré ici
+                },
+                None => Err("Syntax: e *[code]".to_owned()) // Si aucun code (None), retourne une erreur
+            } {
+                // Deuxième match, affiche le résultat / l'erreur, que ce soit du premier match ou de l'execution du code
+                Ok(()) => {println!("{:?}",compiler.get_result());},
+                Err(e) => {println!("{}",e)}
+            }
+
+        }
+        // Pour tout autre paterne de commande, on ne connnais pas, affichage de l'aide
+        _ => {
+            println!("Unknow command. Type 'help' or '?' to get help.")
+        }
+    }
+}
+
+// L'invite de commande
 pub fn command_line() {
+
+    // Affichage du message d'introduction 
     println!("Esianolop v1.0b, par Cyprien Bourotte.\nType 'help' or '?' to get help.");
     
-    let mut compiler = esianolop::structs::Esianolop{
-        values:Vec::new()
-    };
+    // Création d'une instance d'un compilateur.
+    let mut compiler = esianolop::structs::Esianolop::new();
 
-    loop {
-        print!(">> ");
-        io::stdout().flush().unwrap();
+    loop { // Boucle infinie
+
+        // Affichage du curseur
+        print!(">> ");io::stdout().flush().unwrap();
+        
+        // L'équivalent d'un input (prend le stdin et le met dans input_str)
         let mut input_str = String::new();
         io::stdin().read_line(&mut input_str).expect("error: unable to read user input");
+
+        // Découpe l'input en série d'arguments séparé par un espace (+ trimage d'espaces / tabulation / \r en trop)
         let mut input: Vec<&str>= input_str.trim().split(" ").filter(|x| x.to_owned().trim() != "" ).collect::<Vec<&str>>();
+        
+        // Si la commande est vide, on recommence la loop
         if input.len() == 0 {
             println!("Empty command."); continue;
         }
-        match input[0] {
-            "?" | "help" => {
-                help()
-            }
-            "q" | "quit" => {process::exit(1);}
-            "r" | "reset" => {
-                compiler.values = Vec::new();
-            }
-            "p" | "print" => {println!("{:?}",compiler.values);}
-            "e" | "exe" | "x" => {
-                match match input.get(1..(input.len())) {
-                    Some(e) => {
-                        println!("{:?}",&e.join(" "));
-                        compiler.parse_text(&e.join(" "))
-                    },
-                    None => Err("Syntax: e *[code]".to_owned())
-                }{
-                    Ok(()) => {},
-                    Err(e) => {println!("{} \n for \"{:?}\"",e,input.get(1..(input.len())))}
-                }
 
-            }
-            _ => {
-                println!("Unknow command. Type 'help' or '?' to get help.")
-            }
-        }
+        // On execute notre fonction
+        execute_command(input,&mut compiler);
     }
 
 }
 
+// Le point d'entré de notre programme.
 fn main() {
 
-
+    // Récupération des arguments (args[0] correspond au chemin de l'executable)
     let args: Vec<String> = env::args().collect();
 
+    // Si il n'y a pas d'arguments (autre que le chemin de l'executable)
     if args.len() <= 1 {
         println!("Starting command-line use, because no arguments has been given");
         command_line();
     }
-    println!("{:?}",args);
+    
+    // On créé un compilateur
+    let mut compiler = esianolop::structs::Esianolop::new();
 
-    let mut compiler = esianolop::structs::Esianolop{
-        values:Vec::new()
-    };
+    // Découpe l'input en série d'arguments séparé par un espace (+ trimage d'espaces / tabulation / \r en trop)
+    let mut input: Vec<&str>= args.get(1..(args.len())).unwrap().iter().filter(|x| x.to_owned().trim() != "" ).map(|x| x as &str).collect::<Vec<&str>>();
+    
 
-    let tests = [
-        "1 2 3 >~","1 2 3 pow add","1 2 3 >pow add","1 2 3 >","1 2 3 ><","1 2 3 <>"
-    ];
-
-    for x in tests.iter() {
-        compiler.values = Vec::new();
-        println!("{:?}",compiler.parse_text(x));
-        println!("{:?}",compiler.values);
-
-    }
+    execute_command(input, &mut compiler);
 
 }
