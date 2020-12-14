@@ -16,14 +16,15 @@ Commandes :
  - quit|q          : Quitte l'invite de commande
     
 Instructions :
- - add|+ : ajoute les 2 valeurs
- - sub|- : soustrait les 2 valeurs
- - mul|* : multiplie les 2 valeurs
- - div|/ : divise les 2 valeurs
- - pow|^ : met en puissance les 2 valeurs
- - dpL|< : duplique la valeur et la place devant
- - dpR|> : duplique la valeur et la place derrière
- - dup|~ : duplique la valeur et la place à coté
+ - add|+ : Ajoute les 2 valeurs
+ - sub|- : Soustrait les 2 valeurs
+ - mul|* : Multiplie les 2 valeurs
+ - div|/ : Divise les 2 valeurs
+ - pow|^ : Met en puissance les 2 valeurs
+ - dpL|< : Duplique la valeur et la place devant
+ - dpR|> : Duplique la valeur et la place derrière
+ - dup|~ : Duplique la valeur et la place à coté
+ - del|! : Supprimer la valeur
  - <nb>  : Insère un noeu nombre
 
 Pour chaque instruction vous pouvez spécifiez si elle se fera sur le devant du stack (avec un "<" devant, par défault) ou sur le fond -par défault juste pour les nombres- (avec un ">" devant)
@@ -32,11 +33,13 @@ Par exemple '2 3 <1' donnera '1 2 3' car le 1 à été inséré au devant du sta
     
 Exemples :
  - '1 2 3 >~'       => '1 2 3 3' (duplique la dernière valeur)
+ - '1 2 3 ~'        => '1 1 2 3' (duplique la première valeur)
  - '1 2 3 pow add'  => 'Add(Pow(1,2),3)'
  - '1 2 3 >pow add' => 'Add(1,Pow(2,3))'
  - '1 2 3 >'        => '1 2 3 3'
  - '1 2 3 ><'       => '3 1 2 3' (duplique la dernière valeur au devant)
  - '1 2 3 <>'       => '1 2 3 1' (duplique la première valeur derrière)
+ - 'e 2 3 <1 >!'    => '1 2' (on ajoute 1 au début et supprime le 3)
 "#
 )
 }

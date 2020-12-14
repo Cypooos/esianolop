@@ -106,7 +106,7 @@ impl Esianolop {
     fn execute_instruction(&mut self, vec_from_down:bool,specified:bool, instruction:&str) -> Result<(),String> {
 
         match instruction {
-            // les opérations qui prennent 2 entrées dans le stack 
+            // ----- les opérations qui prennent 2 entrées dans le stack -----
             "+" | "add" |
             "-" | "sub" |
             "*" | "mul" |
@@ -151,7 +151,7 @@ impl Esianolop {
             },
 
 
-            // The duplicate instructions
+            // ----- The duplicate instructions -----
             "~" | "dup" |
             "<" | "dpl" |
             ">" | "dpr" => {
@@ -187,6 +187,7 @@ impl Esianolop {
 
                 Ok(()) // Tout est bon, on retourne Ok(()) !
             },
+            // ----- Les opérations qui prennent 1 entrée -----
             "$" | "sqr" => {
                 match vec_from_down {
                     false => {
@@ -209,6 +210,18 @@ impl Esianolop {
                 };
                 Ok(())
             }
+            // ----- Delete -----
+            "!" | "del" => {
+                if self.values.len() == 0 {
+                    return Err("no value to remove".to_owned());
+                }
+                match vec_from_down {
+                    false => self.values.remove(self.values.len()-1),
+                    true => self.values.remove(0),
+                };
+                Ok(())
+            }
+                // ----- Le reste (fonctions, nombre, non-définie) -----
             ins => {
                 match ins.to_owned().parse::<usize>() {
                     Ok(e) => {
