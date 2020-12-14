@@ -1,4 +1,9 @@
 use std::fmt;
+use std::env;
+use std::fs;
+use std::num;
+
+
 #[derive(Clone)]
 #[derive(Debug)]
 pub enum EsianolopInstruction {
@@ -9,8 +14,29 @@ pub enum EsianolopInstruction {
     Div(Box<EsianolopInstruction>,Box<EsianolopInstruction>),
     Pow(Box<EsianolopInstruction>,Box<EsianolopInstruction>),
     Dup(Box<EsianolopInstruction>),
+    DpL(Box<EsianolopInstruction>),
+    DpR(Box<EsianolopInstruction>),
     Sqr(Box<EsianolopInstruction>),
     Num(usize),
+}
+
+impl EsianolopInstruction {
+
+    pub fn execute(&self) -> usize {
+        match self {
+            EsianolopInstruction::Nul => {return 0},
+            EsianolopInstruction::Add(a,b) => {return a.execute()+b.execute()},
+            EsianolopInstruction::Sub(a,b) => {return a.execute()-b.execute()},
+            EsianolopInstruction::Mul(a,b) => {return a.execute()*b.execute()},
+            EsianolopInstruction::Div(a,b) => {return a.execute()/b.execute()},
+            EsianolopInstruction::Pow(a,b) => {return a.execute().pow(b.execute() as u32)},
+            EsianolopInstruction::Dup(a) => {return a.execute()},
+            EsianolopInstruction::DpL(a) => {return a.execute()},
+            EsianolopInstruction::DpR(a) => {return a.execute()},
+            EsianolopInstruction::Sqr(a) => {return (a.execute() as f64).sqrt() as usize},
+            EsianolopInstruction::Num(a) => {return *a},
+        }
+    }
 }
 
 impl fmt::Display for EsianolopInstruction {
@@ -25,6 +51,8 @@ impl fmt::Display for EsianolopInstruction {
             EsianolopInstruction::Div(a,b) => {return write!(f,"Div({},{})",a,b)},
             EsianolopInstruction::Pow(a,b) => {return write!(f,"Pow({},{})",a,b)},
             EsianolopInstruction::Dup(a) => {return write!(f,"Dup({})",a)},
+            EsianolopInstruction::DpL(a) => {return write!(f,"DpL({})",a)},
+            EsianolopInstruction::DpR(a) => {return write!(f,"DpR({})",a)},
             EsianolopInstruction::Sqr(a) => {return write!(f,"Sqr({})",a)},
             EsianolopInstruction::Num(a) => {return write!(f,"Num({})",a)},
         }
@@ -45,20 +73,28 @@ impl Esianolop {
         }
     }
 
-
     
+    pub fn parse_file(&mut self,filename:&str) -> Result<(),String> {
+
+        match fs::read_to_string(filename.to_owned()) {
+            Ok(e) => {return self.parse_text(&e)},
+            Err(e)=> {return Err(format!("Error while parsing the file: {}",e))},
+        }
+    }
+
+    pub fn get_result(&self) -> Vec<usize> {
+        return self.values.iter().map(|x| x.execute()).collect::<Vec<usize>>()
+    }
+
     pub fn parse_text(&mut self,text:&str) -> Result<(),String> {
         
         for (line_nb,line) in text.split("\n").map(|x| x.to_owned()).enumerate() {
             for (ins_nb, mut instruction) in line.split(";").collect::<Vec<&str>>()[0].split("#").collect::<Vec<&str>>()[0].split(" ").filter(|x| x.to_owned().trim() != "" ).enumerate() {
                 let mut vec_from_down = true;
                 let mut specified = false;
-                if instruction.chars().nth(0) == Some('<') || instruction.chars().nth(0) == Some('>') {
+                if (instruction.len() >= 2) & (instruction.chars().nth(0) == Some('<') || instruction.chars().nth(0) == Some('>')) {
                     vec_from_down = instruction.chars().nth(0) == Some('<');
-                    instruction = match instruction.chars().next().map(|c| &instruction[c.len_utf8()..]) {
-                        None | Some("") => {return Err(format!("Error at {}:{}, Empty instruction with only stack orientation specified",line_nb,ins_nb))},
-                        Some(e) => e,
-                    };
+                    instruction = instruction.chars().next().map(|c| &instruction[c.len_utf8()..]).unwrap();
                     specified = true;
                 }
                 match instruction.to_ascii_lowercase().as_str() {
@@ -171,14 +207,14 @@ impl Esianolop {
                                 self.values.push(t);
                             }
                         };
-                    }
+                    },
                     "~" | "dup" => {
                         match vec_from_down {
                             false => {
                                 let temp = self.values.get(self.values.len()-1);
                                 let val = match temp {
                                     Some(e) => e,
-                                    None => return Err(format!("Error at {}:{}, no value in buffer to duplicate left.",line_nb,ins_nb))
+                                    None => return Err(format!("Error at {}:{}, no value in buffer to duplicate right to right.",line_nb,ins_nb))
                                 };
                                 self.values.push(EsianolopInstruction::Dup(Box::new(val.clone())));
                             },
@@ -186,12 +222,61 @@ impl Esianolop {
                                 let temp = self.values.get(0);
                                 let val = match temp {
                                     Some(e) => e,
-                                    None => return Err(format!("Error at {}:{}, no value in buffer to duplicate right.",line_nb,ins_nb))
+                                    None => return Err(format!("Error at {}:{}, no value in buffer to duplicate left to left.",line_nb,ins_nb))
                                 };
-                                self.values[0] = EsianolopInstruction::Dup(Box::new(val.clone()));
+                                let mut tmp = Vec::new();
+                                tmp.push(EsianolopInstruction::Dup(Box::new(val.clone())));
+                                tmp.extend(self.values.to_owned());
+                                self.values = tmp;
                             }
                         }
-                    }
+                    },
+                    "<" | "dpl" => {
+                        match vec_from_down {
+                            false => {
+                                let temp = self.values.get(self.values.len()-1);
+                                let val = match temp {
+                                    Some(e) => e,
+                                    None => return Err(format!("Error at {}:{}, no value in buffer to duplicate right to left.",line_nb,ins_nb))
+                                };
+                                let mut tmp = Vec::new();
+                                tmp.push(EsianolopInstruction::DpL(Box::new(val.clone())));
+                                tmp.extend(self.values.to_owned());
+                                self.values = tmp;
+                            },
+                            true => {
+                                let temp = self.values.get(0);
+                                let val = match temp {
+                                    Some(e) => e,
+                                    None => return Err(format!("Error at {}:{}, no value in buffer to duplicate left to left.",line_nb,ins_nb))
+                                };
+                                let mut tmp = Vec::new();
+                                tmp.push(EsianolopInstruction::DpL(Box::new(val.clone())));
+                                tmp.extend(self.values.to_owned());
+                                self.values = tmp;
+                            }
+                        }
+                    },
+                    ">" | "dpr" => {
+                        match vec_from_down {
+                            false => {
+                                let temp = self.values.get(self.values.len()-1);
+                                let val = match temp {
+                                    Some(e) => e,
+                                    None => return Err(format!("Error at {}:{}, no value in buffer to duplicate right to right.",line_nb,ins_nb))
+                                };
+                                self.values.push(EsianolopInstruction::DpR(Box::new(val.clone())));
+                            },
+                            true => {
+                                let temp = self.values.get(0);
+                                let val = match temp {
+                                    Some(e) => e,
+                                    None => return Err(format!("Error at {}:{}, no value in buffer to duplicate left to right.",line_nb,ins_nb))
+                                };
+                                self.values.push(EsianolopInstruction::DpR(Box::new(val.clone())));
+                            }
+                        }
+                    },
                     "$" | "sqr" => {
                         match vec_from_down {
                             false => {
@@ -201,6 +286,7 @@ impl Esianolop {
                                     None => return Err(format!("Error at {}:{}, no value in buffer to take the left square root.",line_nb,ins_nb))
                                 };
                                 self.values.push(EsianolopInstruction::Sqr(Box::new(val.clone())));
+                                self.values.drain((self.values.len()-2)..(self.values.len()-1));
                             },
                             true => {
                                 let temp = self.values.get(0);
