@@ -138,3 +138,7 @@ fn main() {
     execute_command(input, &mut compiler);
 
 }
+
+
+// Big tests :
+// e test:7:uwu:+:owo:2: test owo uwu

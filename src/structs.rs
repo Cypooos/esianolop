@@ -126,12 +126,12 @@ impl Esianolop {
                 let vals = if vec_from_down {
                         match self.values.get(0..2) {
                             Some(e) => e,
-                            None => return Err(format!("not enogth values in buffer to left '{:?}'",operation_fn))
+                            None => return Err(format!("not enogth values in buffer to left '{}'",instruction))
                         }
                     } else {
                         match self.values.get((self.values.len()-2)..(self.values.len())) {
                             Some(e) => e,
-                            None => return Err(format!("not enogth values in buffer to right '{:?}'",operation_fn))
+                            None => return Err(format!("not enogth values in buffer to right '{}'",instruction))
                         }
                     };
                 
@@ -164,13 +164,13 @@ impl Esianolop {
                         let temp = self.values.get(0);
                         match temp {
                             Some(e) => e,
-                            None => return Err(format!("no value in buffer to duplicate left to {}.", if right_is_destination {"right"} else {"left"}))
+                            None => return Err(format!("no value in buffer to duplicate left to {}", if right_is_destination {"right"} else {"left"}))
                         }
                     } else {
                         let temp = self.values.get(self.values.len()-1);
                         match temp {
                             Some(e) => e,
-                            None => return Err(format!("no value in buffer to duplicate right to {}.",if right_is_destination {"right"} else {"left"}))
+                            None => return Err(format!("no value in buffer to duplicate right to {}",if right_is_destination {"right"} else {"left"}))
                         }
                     };
                  
@@ -194,7 +194,7 @@ impl Esianolop {
                         let temp = self.values.get(self.values.len()-1);
                         let val = match temp {
                             Some(e) => e,
-                            None => return Err("no value in buffer to take the left square root.".to_owned())
+                            None => return Err("no value in buffer to take the left square root".to_owned())
                         };
                         self.values.push(EsianolopInstruction::Sqr(Box::new(val.clone())));
                         self.values.drain((self.values.len()-2)..(self.values.len()-1));
@@ -203,7 +203,7 @@ impl Esianolop {
                         let temp = self.values.get(0);
                         let val = match temp {
                             Some(e) => e,
-                            None => return Err("no value in buffer to take the right square root.".to_owned())
+                            None => return Err("no value in buffer to take the right square root".to_owned())
                         };
                         self.values[0] = EsianolopInstruction::Sqr(Box::new(val.clone()));
                     }
@@ -242,9 +242,12 @@ impl Esianolop {
                         
                         if self.functions.contains_key(ins) { // Si c'est dans la liste des fonctions
                             let x = &self.functions.get(ins).unwrap().clone(); // On prend le code défini par la fonction
-                            return self.parse_text(x) // Execute le code de la fonction (marche pour les fonctions récursive donc)
+                            return match self.parse_text(x) { // Execute le code de la fonction (marche pour les fonctions récursive donc)
+                                Err(e) => Err(e+" in function "+ins), // Ajout à l'erreur des informations de la trace
+                                Ok(_) => Ok(())
+                            } 
                         } else {
-                            return Err("not a valid expression.".to_owned())
+                            return Err("not a valid expression nor function".to_owned())
                         }
                         
                     }
@@ -265,12 +268,25 @@ impl Esianolop {
             // Retire les commentaires du code
             let no_comment = line.split(";").collect::<Vec<&str>>()[0].split("#").collect::<Vec<&str>>()[0];
 
-            // On énumère toutes les instructions, mais avec la possibilité d'en skipper (en utillisant table.next()) 
-            let mut table_iter = no_comment.split(" ").filter(|x| x.to_owned().trim() != "" ).enumerate();
-            while let Some((ins_nb, mut instruction)) = table_iter.next() {
+            let mut skip_colum = 0;
 
-                
-                // Si c'est une définition de fonction, on skip j'usqu'a la fin de la def
+            // On énumère toutes les instructions, mais avec la possibilité d'en skipper (en utillisant table.next()), pour les fonctions 
+            let mut table_iter = no_comment.split(" ").filter(|x| x.to_owned().trim() != "" ).enumerate();
+            
+            let mut active_instruction = table_iter.next();
+            let mut in_function = false;
+            while let Some((ins_nb, mut instruction)) = active_instruction {
+
+                println!("{}",instruction);
+
+                if in_function {
+                    instruction = instruction.split(":").collect::<Vec<&str>>()[1];
+                    in_function = false;
+                }
+
+                if instruction.trim() == "" {active_instruction = table_iter.next();continue};
+
+                // Si c'est une définition de fonction/for, on skip j'usqu'a la fin de la def
                 if instruction.contains(":") {
 
                     println!("Founded function at {}:{}",line_nb,ins_nb);
@@ -281,19 +297,60 @@ impl Esianolop {
                     line_rest = instruction.to_owned()+ " "+&line_rest; // adding instruction
                     println!("Line_rest:{}",line_rest);
                     
-                    let function_name = line_rest.split(":").collect::<Vec<&str>>()[0]; // take the name
+                    let function_name = line_rest.split(":").collect::<Vec<&str>>()[0].trim(); // take the name
                     let mut function_code = line_rest.split(":").collect::<Vec<&str>>()[1]; // take the rest (function def and rest of the line)
                     
-                    if function_code.contains(":") { // ther is code behind the function, and so there is a limit
+
+                    if function_code.contains(":") { // In case of code behind the function, put a limit
                         function_code = function_code.split(":").collect::<Vec<&str>>()[0];
                     };
 
-                    if (function_name == "") | (function_code == "") | (self.functions.contains_key(function_name)) { return Err("trying to define an empty function".to_owned())} 
-                    println!("Defing function {} with {}",function_name,function_code);
-                    self.functions.insert(function_name.to_owned(), function_code.to_owned()); // Ajouter la fonction à la hashmap
-                    
-                    table_iter.nth(function_code.matches(' ').count());
-                    return Ok(())
+                    if (function_name == "") | (function_code.trim() == "") { return Err("trying to define an empty function".to_owned())} 
+                    if self.functions.contains_key(function_name) {return Err("trying to define already-defined function".to_owned())}
+                    println!("Defing function {} with {}",function_name,function_code.trim());
+
+                    // Skiping to the end of the function
+                    let skip_count = function_code.matches(' ').count();
+                    if skip_count == 0{
+                        in_function = false;
+                        active_instruction = Some((ins_nb, &instruction.split(":")
+                        .collect::<Vec<&str>>()
+                        .get(2..)
+                        .unwrap()
+                        .join(":")));
+                    } else {
+                        active_instruction = table_iter.nth(skip_count-1);
+                        instruction.split(":").collect::<Vec<&str>>()[1..].join(":");
+                    }
+
+                    match function_name {
+                        // If define a function named for => if doing a for, called the code x times
+                        "for" | "<for" | ">for" => {
+
+                            // If no number for the loop
+                            if self.values.len() == 0 {
+                                return Err("aptended a for with nothing in the stack".to_owned())
+                            }
+
+                            // get the Index of the position of the number for the loop
+                            let index = if &function_name[0..0] == "<" {0} else {self.values.len()-1};
+                            let nb = self.values[index].execute(); // Get the number of loops
+                            self.values.remove(index); // Remove it
+
+                            for _ in 0..nb { // Do the for
+                                match self.parse_text(function_code.trim()) {
+                                    Err(e) => return Err(e+" in for loop"),
+                                    Ok(_)=> (),
+                                }
+                            }
+                        }
+                        // Else, define function
+                        _ => {
+                            self.functions.insert(function_name.to_owned(), function_code.trim().to_owned()); // Ajouter la fonction à la hashmap
+                            //println!("Defined !");
+                        }
+                    };
+                    continue;
                 }
 
                 // On test si il y a un "<" ou ">" devant
