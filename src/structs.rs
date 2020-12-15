@@ -119,7 +119,7 @@ impl Esianolop {
                     "*" | "mul" => EsianolopInstruction::Mul,
                     "/" | "div" => EsianolopInstruction::Div,
                     "^" | "pow" => EsianolopInstruction::Pow,
-                    _           => EsianolopInstruction::Add // should never happen
+                    _           => unreachable!() // Ne devrai jamais arriver
                 };
                 
                 // Obtenir les 2 premières valeures du stack / deux dernières
@@ -238,11 +238,20 @@ impl Esianolop {
                             }
                         }
                     },
-                    Err(_) => return Err("not a valid expression.".to_owned())
+                    Err(_) => {
+                        
+                        if self.functions.contains_key(ins) { // Si c'est dans la liste des fonctions
+                            let x = &self.functions.get(ins).unwrap().clone(); // On prend le code défini par la fonction
+                            return self.parse_text(x) // Execute le code de la fonction (marche pour les fonctions récursive donc)
+                        } else {
+                            return Err("not a valid expression.".to_owned())
+                        }
+                        
+                    }
                 };
-                Ok(())
+                Ok(()) // Tout vas bien !
             }
-        }
+        } 
     }
     
 
@@ -251,13 +260,41 @@ impl Esianolop {
     pub fn parse_text(&mut self,text:&str) -> Result<(),String> {
         
         // Pour chaque ligne
-        for (line_nb,line) in text.split("\n").map(|x| x.to_owned()).enumerate() {
+        for (line_nb,line) in text.to_ascii_lowercase().split("\n").map(|x| x.to_owned()).enumerate() {
 
             // Retire les commentaires du code
             let no_comment = line.split(";").collect::<Vec<&str>>()[0].split("#").collect::<Vec<&str>>()[0];
 
-            // On énumère toutes les instructions
-            for (ins_nb, mut instruction) in no_comment.split(" ").filter(|x| x.to_owned().trim() != "" ).enumerate() {
+            // On énumère toutes les instructions, mais avec la possibilité d'en skipper (en utillisant table.next()) 
+            let mut table_iter = no_comment.split(" ").filter(|x| x.to_owned().trim() != "" ).enumerate();
+            while let Some((ins_nb, mut instruction)) = table_iter.next() {
+
+                
+                // Si c'est une définition de fonction, on skip j'usqu'a la fin de la def
+                if instruction.contains(":") {
+
+                    println!("Founded function at {}:{}",line_nb,ins_nb);
+
+                    let mut line_rest = table_iter.clone().map(|(_,y)|y) // take the reset of the line
+                        .collect::<Vec<&str>>().join(" ").to_owned();
+                    
+                    line_rest = instruction.to_owned()+ " "+&line_rest; // adding instruction
+                    println!("Line_rest:{}",line_rest);
+                    
+                    let function_name = line_rest.split(":").collect::<Vec<&str>>()[0]; // take the name
+                    let mut function_code = line_rest.split(":").collect::<Vec<&str>>()[1]; // take the rest (function def and rest of the line)
+                    
+                    if function_code.contains(":") { // ther is code behind the function, and so there is a limit
+                        function_code = function_code.split(":").collect::<Vec<&str>>()[0];
+                    };
+
+                    if (function_name == "") | (function_code == "") | (self.functions.contains_key(function_name)) { return Err("trying to define an empty function".to_owned())} 
+                    println!("Defing function {} with {}",function_name,function_code);
+                    self.functions.insert(function_name.to_owned(), function_code.to_owned()); // Ajouter la fonction à la hashmap
+                    
+                    table_iter.nth(function_code.matches(' ').count());
+                    return Ok(())
+                }
 
                 // On test si il y a un "<" ou ">" devant
                 let mut vec_from_down = true;

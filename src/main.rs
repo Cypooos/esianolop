@@ -12,7 +12,8 @@ Commandes :
  - exe|x|e [code]* : Execute le code [code]*
  - help|?          : Affiche l'aide
  - print|p         : Affiche les arbres du compilers
- - reset|r         : Reset le compilateur
+ - reset|r         : Reset les arbres du compilateur
+ - null|n          : Reset le compilateur
  - quit|q          : Quitte l'invite de commande
     
 Instructions :
@@ -45,7 +46,7 @@ Exemples :
 }
 
 // Fonction qui execute du code en ligne de commande. Ne retourne rien, affiche directement
-fn execute_command(input:Vec<&str>,compiler:&mut esianolop::structs::Esianolop) {
+fn execute_command(input:Vec<&str>,mut compiler:&mut esianolop::structs::Esianolop) {
 
     // On regarde le permier argument
     match input[0] {
@@ -54,6 +55,11 @@ fn execute_command(input:Vec<&str>,compiler:&mut esianolop::structs::Esianolop) 
         "q" | "quit" => process::exit(0), // Quitter l'application
         "r" | "reset" => compiler.values = Vec::new(), // On reset le stack
         "p" | "print" => println!("{:?} => {:?}",compiler.values,compiler.get_result()), // On affiche le stack / le stack compilé
+        "n" | "null" => {
+            // Reset tout le compilateur (fonctions aussi)
+            *compiler = esianolop::structs::Esianolop::new();
+            println!("Interpréteur reset.");
+        }, 
         "e" | "exe" | "x" => { 
             
             // Il y a un double match ici, gloire à rust ^^
