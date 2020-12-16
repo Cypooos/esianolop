@@ -1,8 +1,7 @@
 use std::fmt;
-use std::env;
 use std::fs;
-use std::num;
 use std::collections::HashMap;
+use std::convert::TryFrom;
 
 
 // Définition de la liste des instructions (sans les fonctions, ni les for, ils se font à coté)
@@ -26,19 +25,23 @@ pub enum EsianolopInstruction {
 impl EsianolopInstruction {
 
     // La fonction execute donne le résultat. Elle est récursive car elle appelle ces/son fil(s) pour connaitre sa valeur
-    pub fn execute(&self) -> usize {
+    pub fn execute(&self) -> Result<usize,&str> {
         match self {
-            EsianolopInstruction::Nul => {return 0},
-            EsianolopInstruction::Add(a,b) => {return a.execute()+b.execute()},
-            EsianolopInstruction::Sub(a,b) => {return a.execute()-b.execute()},
-            EsianolopInstruction::Mul(a,b) => {return a.execute()*b.execute()},
-            EsianolopInstruction::Div(a,b) => {return a.execute()/b.execute()},
-            EsianolopInstruction::Pow(a,b) => {return a.execute().pow(b.execute() as u32)},
+            EsianolopInstruction::Nul => {return Ok(0)},
+            EsianolopInstruction::Add(a,b) => {return a.execute()?.checked_add(b.execute()?).ok_or("overflow in addition")},
+            EsianolopInstruction::Sub(a,b) => {return a.execute()?.checked_sub(b.execute()?).ok_or("negative or overflow in substraction")},
+            EsianolopInstruction::Div(a,b) => {return a.execute()?.checked_div(b.execute()?).ok_or("can't divide")},
+            EsianolopInstruction::Mul(a,b) => {return a.execute()?.checked_mul(b.execute()?).ok_or("overflow in multiplication")},
+            EsianolopInstruction::Pow(a,b) => {return a.execute()?.checked_pow(b.execute()? as u32).ok_or("overflow in powering")},
             EsianolopInstruction::Dup(a) => {return a.execute()},
             EsianolopInstruction::DpL(a) => {return a.execute()},
             EsianolopInstruction::DpR(a) => {return a.execute()},
-            EsianolopInstruction::Sqr(a) => {return (a.execute() as f64).sqrt() as usize},
-            EsianolopInstruction::Num(a) => {return *a},
+            EsianolopInstruction::Sqr(a) => {
+                let res = (a.execute()? as f64).sqrt();
+                if res.is_nan() {return Err("negative square-root")};
+                return Ok(res as usize)
+            },
+            EsianolopInstruction::Num(a) => {return Ok(*a)},
         }
     }
 }
@@ -100,7 +103,7 @@ impl Esianolop {
 
     // retourne le stack avec toutes les arbres calculés.
     pub fn get_result(&self) -> Vec<usize> {
-        return self.values.iter().map(|x| x.execute()).collect::<Vec<usize>>()
+        return self.values.iter().map(|x| x.execute()).collect::<Vec<Result<usize,String>>>()
     }
 
     fn execute_instruction(&mut self, vec_from_down:bool,specified:bool, instruction:&str) -> Result<(),String> {
@@ -242,6 +245,7 @@ impl Esianolop {
                         
                         if self.functions.contains_key(ins) { // Si c'est dans la liste des fonctions
                             let x = &self.functions.get(ins).unwrap().clone(); // On prend le code défini par la fonction
+                            println!("executing function {} with {}",ins,x);
                             return match self.parse_text(x) { // Execute le code de la fonction (marche pour les fonctions récursive donc)
                                 Err(e) => Err(e+" in function "+ins), // Ajout à l'erreur des informations de la trace
                                 Ok(_) => Ok(())
@@ -261,6 +265,8 @@ impl Esianolop {
 
     // Execute du code Esianolop multilignes, retourne soit Ok(()), ou Err(message d'erreur)
     pub fn parse_text(&mut self,text:&str) -> Result<(),String> {
+
+        println!("Executing '{}'",text);
         
         // Pour chaque ligne
         for (line_nb,line) in text.to_ascii_lowercase().split("\n").map(|x| x.to_owned()).enumerate() {
@@ -275,9 +281,10 @@ impl Esianolop {
             
             let mut active_instruction = table_iter.next();
             let mut in_function = false;
+            let mut temp_lifetime_instruction:String;
             while let Some((ins_nb, mut instruction)) = active_instruction {
 
-                println!("{}",instruction);
+                //println!("{}",instruction);
 
                 if in_function {
                     instruction = instruction.split(":").collect::<Vec<&str>>()[1];
@@ -289,13 +296,13 @@ impl Esianolop {
                 // Si c'est une définition de fonction/for, on skip j'usqu'a la fin de la def
                 if instruction.contains(":") {
 
-                    println!("Founded function at {}:{}",line_nb,ins_nb);
+                    //println!("Founded function at {}:{}",line_nb,ins_nb);
 
                     let mut line_rest = table_iter.clone().map(|(_,y)|y) // take the reset of the line
                         .collect::<Vec<&str>>().join(" ").to_owned();
                     
                     line_rest = instruction.to_owned()+ " "+&line_rest; // adding instruction
-                    println!("Line_rest:{}",line_rest);
+                    //println!("Line_rest:{}",line_rest);
                     
                     let function_name = line_rest.split(":").collect::<Vec<&str>>()[0].trim(); // take the name
                     let mut function_code = line_rest.split(":").collect::<Vec<&str>>()[1]; // take the rest (function def and rest of the line)
@@ -313,14 +320,16 @@ impl Esianolop {
                     let skip_count = function_code.matches(' ').count();
                     if skip_count == 0{
                         in_function = false;
-                        active_instruction = Some((ins_nb, &instruction.split(":")
-                        .collect::<Vec<&str>>()
-                        .get(2..)
-                        .unwrap()
-                        .join(":")));
+                        temp_lifetime_instruction = instruction.split(":").map(|x|x.to_owned()).collect::<Vec<String>>().get(2..).unwrap().join(":");
+                        active_instruction = Some((ins_nb, &temp_lifetime_instruction));
                     } else {
-                        active_instruction = table_iter.nth(skip_count-1);
-                        instruction.split(":").collect::<Vec<&str>>()[1..].join(":");
+                        active_instruction =table_iter.nth(skip_count-1);
+                        let (pos,ins) = match active_instruction {
+                            None  => {return Err("jump to function end failed".to_owned())},
+                            Some((pos,ins)) => (pos,ins),
+                        };
+                        temp_lifetime_instruction = ins.split(":").map(|x|x.to_owned()).collect::<Vec<String>>().get(1..).unwrap().join(":");
+                        active_instruction = Some((pos,&temp_lifetime_instruction));
                     }
 
                     match function_name {
@@ -352,6 +361,9 @@ impl Esianolop {
                     };
                     continue;
                 }
+
+                // On charge l'instruction suivante pour la prochaine boucle
+                active_instruction =table_iter.next();
 
                 // On test si il y a un "<" ou ">" devant
                 let mut vec_from_down = true;

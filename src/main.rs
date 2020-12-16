@@ -54,6 +54,21 @@ fn execute_command(input:Vec<&str>,mut compiler:&mut esianolop::structs::Esianol
         "?" | "help" => help(), // Affichage de l'aide
         "q" | "quit" => process::exit(0), // Quitter l'application
         "r" | "reset" => compiler.values = Vec::new(), // On reset le stack
+        "f" | "file" => { // On lit un fichier
+            
+            // Il y a un double match ici, gloire à rust ^^
+            // Le premier retourne l'execution des arguments si ils y sont, sinon retourne une erreur
+            match match input.get(1..(input.len())) {
+                Some(e) => {
+                    compiler.parse_file(&e.join(" ")) // le match renvoie l'execution du fichier entré ici
+                },
+                None => Err("Syntax: f <file_path>".to_owned()) // Si aucun code (None), retourne une erreur
+            } {
+                // Deuxième match, affiche le résultat / l'erreur, que ce soit du premier match ou de l'execution du code
+                Ok(()) => {println!("{:?}",compiler.get_result());},
+                Err(e) => {println!("{}",e)}
+            }
+        },
         "p" | "print" => println!("{:?} => {:?}",compiler.values,compiler.get_result()), // On affiche le stack / le stack compilé
         "n" | "null" => {
             // Reset tout le compilateur (fonctions aussi)
