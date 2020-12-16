@@ -87,7 +87,11 @@ fn execute_command(input:Vec<&str>,mut compiler:&mut esianolop::structs::Esianol
                 None => Err("Syntax: e *[code]".to_owned()) // Si aucun code (None), retourne une erreur
             } {
                 // Deuxième match, affiche le résultat / l'erreur, que ce soit du premier match ou de l'execution du code
-                Ok(()) => {println!("{:?}",compiler.get_result());},
+                Ok(()) => {
+                    let res= compiler.get_result();
+                    println!("results = [{}]",res.iter().map(|x| if x.is_err(){"Err".to_string()}else{x.unwrap().to_string()}).collect::<Vec<String>>().join(", "));
+                    println!("{}",res.iter().filter(|x|x.is_err()).map(|x| format!("Error: {}",x.unwrap_err())).collect::<Vec<String>>().join("\n"));
+                },
                 Err(e) => {println!("{}",e)}
             }
 

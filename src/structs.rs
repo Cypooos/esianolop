@@ -102,8 +102,8 @@ impl Esianolop {
 
 
     // retourne le stack avec toutes les arbres calculés.
-    pub fn get_result(&self) -> Vec<usize> {
-        return self.values.iter().map(|x| x.execute()).collect::<Vec<Result<usize,String>>>()
+    pub fn get_result(&self) -> Vec<Result<usize,&str>> {
+        return self.values.iter().map(|x| x.execute()).collect::<Vec<Result<usize,&str>>>()
     }
 
     fn execute_instruction(&mut self, vec_from_down:bool,specified:bool, instruction:&str) -> Result<(),String> {
@@ -266,15 +266,13 @@ impl Esianolop {
     // Execute du code Esianolop multilignes, retourne soit Ok(()), ou Err(message d'erreur)
     pub fn parse_text(&mut self,text:&str) -> Result<(),String> {
 
-        println!("Executing '{}'",text);
+        //println!("Executing '{}'",text);
         
         // Pour chaque ligne
         for (line_nb,line) in text.to_ascii_lowercase().split("\n").map(|x| x.to_owned()).enumerate() {
 
             // Retire les commentaires du code
             let no_comment = line.split(";").collect::<Vec<&str>>()[0].split("#").collect::<Vec<&str>>()[0];
-
-            let mut skip_colum = 0;
 
             // On énumère toutes les instructions, mais avec la possibilité d'en skipper (en utillisant table.next()), pour les fonctions 
             let mut table_iter = no_comment.split(" ").filter(|x| x.to_owned().trim() != "" ).enumerate();
@@ -312,9 +310,9 @@ impl Esianolop {
                         function_code = function_code.split(":").collect::<Vec<&str>>()[0];
                     };
 
-                    if (function_name == "") | (function_code.trim() == "") { return Err("trying to define an empty function".to_owned())} 
-                    if self.functions.contains_key(function_name) {return Err("trying to define already-defined function".to_owned())}
-                    println!("Defing function {} with {}",function_name,function_code.trim());
+                    if (function_name == "") | (function_code.trim() == "") { return Err(format!("trying to define an empty function at {}:{}",line_nb,ins_nb))} 
+                    if self.functions.contains_key(function_name) {return Err(format!("trying to define already-defined function at {}:{}",line_nb,ins_nb))}
+                    // println!("Defing function {} with {}",function_name,function_code.trim());
 
                     // Skiping to the end of the function
                     let skip_count = function_code.matches(' ').count();
@@ -325,7 +323,7 @@ impl Esianolop {
                     } else {
                         active_instruction =table_iter.nth(skip_count-1);
                         let (pos,ins) = match active_instruction {
-                            None  => {return Err("jump to function end failed".to_owned())},
+                            None  => {return Err(format!("Jump to function end failed at {}:{}",line_nb,ins_nb))},
                             Some((pos,ins)) => (pos,ins),
                         };
                         temp_lifetime_instruction = ins.split(":").map(|x|x.to_owned()).collect::<Vec<String>>().get(1..).unwrap().join(":");
@@ -338,17 +336,21 @@ impl Esianolop {
 
                             // If no number for the loop
                             if self.values.len() == 0 {
-                                return Err("aptended a for with nothing in the stack".to_owned())
+                                return Err(format!("Aptended a for with nothing in the stack at {}:{}",line_nb,ins_nb))
                             }
 
                             // get the Index of the position of the number for the loop
                             let index = if &function_name[0..0] == "<" {0} else {self.values.len()-1};
-                            let nb = self.values[index].execute(); // Get the number of loops
+                            let nb = match self.values[index].execute() {
+                                Ok(e) => e,
+                                Err(e) => return Err(format!("{} in accesing number of for loop at {}:{}",e,line_nb,ins_nb))
+                            }; // Get the number of loops
+
                             self.values.remove(index); // Remove it
 
                             for _ in 0..nb { // Do the for
                                 match self.parse_text(function_code.trim()) {
-                                    Err(e) => return Err(e+" in for loop"),
+                                    Err(e) => return Err(format!("{} in for loop at {}:{}",e,line_nb,ins_nb)),
                                     Ok(_)=> (),
                                 }
                             }
