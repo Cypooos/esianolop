@@ -1,0 +1,7 @@
+# code qui calcule tout les 100 nombre suivants espacé de 1, puis 2, puis 3, ...,  après 73
+
+# on ajoute 1 au premier (le compteur)
+# on duplique le nombre à droiet ET le compteur et les addtionons ensemble
+next:<1 <add >> <> >add:
+
+0 73 100 for:next: <del

@@ -7,7 +7,8 @@
 // Il s'utillise en ligne de commande
 // 
 // Si vous avez besoin d'aide avec le code: cyprien.bourotte@gmail.com
-// 
+// Le dossier "exemples" contiens des fichers executable par l'interpreteur.
+// Vous pouvez le faire via la commande `f exemples/1`
 
 
 // J'importe mes classes
@@ -28,9 +29,9 @@ Commandes :
  - file|f <file>   : Execute le fichier <file>
  - exe|x|e [code]* : Execute le code [code]*
  - help|?          : Affiche l'aide
- - print|p         : Affiche les arbres du compilateur
- - reset|r         : Reset les arbres du compilateur (pas les fonctions)
- - null|n          : Reset le compilateur
+ - print|p         : Affiche les arbres du interpreteur
+ - reset|r         : Reset les arbres du interpreteur (pas les fonctions)
+ - null|n          : Reset l'interpreteur
  - quit|q          : Quitte l'invite de commande
     
 Instructions :
@@ -66,7 +67,7 @@ Fonctions :
    Par exemple, taper `e test:1 2 +:` définie une fonction "test" qui executera "1 2 +". Pour l'appeller, vous pouvez taper son nom ("e test test" donnera [4 2])
  - Certaine fonction sont pré-définie, par exemple la fonction "for" qui execute son code X fois, X étant la valeur dans le stack.
  - Les fonction ne se reset pas avec la commande `reset`, mais seulement avec la commande `null`.
-
+ - Une fonction ne peut etre que défini en une ligne (pas de multiligne possible pour cette version 1.0)
 Exemples :
  - e one:1: plus:+: 3 one plus => Add(1,3)
  - e 90 5 for:2 +:             => 100 (répéter 5 fois "2 +" depuis 90)
@@ -94,15 +95,19 @@ fn execute_command(input:Vec<&str>,mut compiler:&mut esianolop::structs::Esianol
                     compiler.parse_file(&e.join(" ")) // le match renvoie l'execution du fichier entré ici
                 },
                 None => Err("Syntax: f <file_path>".to_owned()) // Si aucun code (None), retourne une erreur
-            } {
+            }  {
                 // Deuxième match, affiche le résultat / l'erreur, que ce soit du premier match ou de l'execution du code
-                Ok(()) => {println!("{:?}",compiler.get_result());},
+                Ok(()) => {
+                    let res= compiler.get_result();
+                    println!("results = [{}]",res.iter().map(|x| if x.is_err(){"Err".to_string()}else{x.unwrap().to_string()}).collect::<Vec<String>>().join(", "));
+                    println!("{}",res.iter().filter(|x|x.is_err()).map(|x| format!("Error: {}",x.unwrap_err())).collect::<Vec<String>>().join("\n"));
+                },
                 Err(e) => {println!("{}",e)}
             }
         },
         "p" | "print" => println!("{:?} => {:?}",compiler.values,compiler.get_result()), // On affiche le stack / le stack compilé
         "n" | "null" => {
-            // Reset tout le compilateur (fonctions aussi)
+            // Reset tout l'interpreteur (fonctions aussi)
             *compiler = esianolop::structs::Esianolop::new();
             println!("Interpréteur reset.");
         }, 
@@ -140,7 +145,7 @@ pub fn command_line() -> ! {
     // Affichage du message d'introduction 
     println!("Esianolop v1.0b, par Cyprien Bourotte.\nType 'help' or '?' to get help.");
     
-    // Création d'une instance du compilateur.
+    // Création d'une instance du interpreteur.
     let mut compiler = esianolop::structs::Esianolop::new();
 
     loop { // Boucle infinie
@@ -178,11 +183,11 @@ fn main() {
         command_line();
     }
     
-    // On créé un compilateur
+    // On créé un interpreteur
     let mut compiler = esianolop::structs::Esianolop::new();
 
     // Découpe l'input en série d'arguments séparé par un espace (+ trimage d'espaces / tabulation / \r en trop)
-    let mut input: Vec<&str>= args.get(1..(args.len())).unwrap().iter().filter(|x| x.to_owned().trim() != "" ).map(|x| x as &str).collect::<Vec<&str>>();
+    let input: Vec<&str>= args.get(1..(args.len())).unwrap().iter().filter(|x| x.to_owned().trim() != "" ).map(|x| x as &str).collect::<Vec<&str>>();
     
 
     execute_command(input, &mut compiler);

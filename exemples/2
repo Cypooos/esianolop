@@ -1,0 +1,13 @@
+# Ce fichier montre l'affichage d'une grosse erreur
+
+# opération de duplication inutile
+#   (sauf que la duplication calcule la valeure suivante,
+#    ce qui dans cette exmples génère un overflow)
+useless: <~ <del:
+useless_caller:useless:
+
+# multiplication par 50 
+next:50 <* useless_caller: 
+
+
+1 50 for:next:

@@ -1,0 +1,16 @@
+# Ce ficher calcule les 80 premières valeures de la suite de Fibonnaci
+# Le résultat sera 
+
+# fonctions qui bouge les arbres de gauche à droite et inversement
+l_to_r:<dpr <del:  ; gauche à droite
+r_to_l:>dpl >del:  ; droite à gauche
+
+# chaque itération, on :
+#   clone les deux bout du stack (1 1 2) => (1 1 1 2 2)
+#   bouge la valeure à gauche à droite (1 1 1 2 2) => (1 1 2 2 1)
+#   fais un add (1 1 2 2 1) => (1 1 2 3)
+# à chaque fois on alterne gauche droite, cette fonction execute donc 2 itérations de la suite
+next:<~ >~ l_to_r >+ <~ >~ r_to_l <+: 
+
+
+1 1 50 for:next:

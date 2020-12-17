@@ -15,9 +15,9 @@ pub enum EsianolopInstruction {
     Sub(Box<EsianolopInstruction>,Box<EsianolopInstruction>),
     Div(Box<EsianolopInstruction>,Box<EsianolopInstruction>),
     Pow(Box<EsianolopInstruction>,Box<EsianolopInstruction>),
-    Dup(Box<EsianolopInstruction>),
-    DpL(Box<EsianolopInstruction>),
-    DpR(Box<EsianolopInstruction>),
+    Dup(usize), // Par soucis de performence, les duplications conserve le résultat directement (non pas une référence)
+    DpL(usize), 
+    DpR(usize), 
     Sqr(Box<EsianolopInstruction>),
     Num(usize),
 }
@@ -35,9 +35,9 @@ impl EsianolopInstruction {
             EsianolopInstruction::Div(a,b) => {return a.execute()?.checked_div(b.execute()?).ok_or("can't divide")},
             EsianolopInstruction::Mul(a,b) => {return a.execute()?.checked_mul(b.execute()?).ok_or("overflow in multiplication")},
             EsianolopInstruction::Pow(a,b) => {return a.execute()?.checked_pow(b.execute()? as u32).ok_or("overflow in powering")},
-            EsianolopInstruction::Dup(a) => {return a.execute()},
-            EsianolopInstruction::DpL(a) => {return a.execute()},
-            EsianolopInstruction::DpR(a) => {return a.execute()},
+            EsianolopInstruction::Dup(a) => {return Ok(*a)},
+            EsianolopInstruction::DpL(a) => {return Ok(*a)},
+            EsianolopInstruction::DpR(a) => {return Ok(*a)},
             EsianolopInstruction::Sqr(a) => {
                 let res = (a.execute()? as f64).sqrt();
                 if res.is_nan() {return Err("negative square-root")};
@@ -70,7 +70,7 @@ impl fmt::Display for EsianolopInstruction {
 }
 
 
-// Definition de la structure pour le compilateur
+// Definition de la structure pour le interpréteur
 // avec    values : Stack d'Arbres 
 // et   fonctions : Des bouts de codes stoqué sous des Strings executes dès que appelé. Un dictionnaire au final.
 pub struct Esianolop {
@@ -108,9 +108,11 @@ impl Esianolop {
         return self.values.iter().map(|x| x.execute()).collect::<Vec<Result<usize,&str>>>()
     }
 
-    fn execute_instruction(&mut self, vec_from_down:bool,specified:bool, instruction:&str) -> Result<(),String> {
+    fn execute_instruction(&mut self, vec_from_down:bool,specified:bool, mut instruction:&str) -> Result<(),String> {
 
-        match instruction {
+        instruction = instruction.trim();
+
+        match instruction.trim() {
             // ----- les opérations qui prennent 2 entrées dans le stack -----
             "+" | "add" |
             "-" | "sub" |
@@ -126,7 +128,7 @@ impl Esianolop {
                     "*" | "mul" => EsianolopInstruction::Mul,
                     "/" | "div" => EsianolopInstruction::Div,
                     "^" | "pow" => EsianolopInstruction::Pow,
-                    _           => unreachable!() // Ne devrai jamais arriver, mais si oui, panique le programme (arret brutal)
+                    e           => {println!("What ???:{:?}",e);unreachable!()} // Ne devrai jamais arriver, mais si oui, panique le programme (arret brutal)
                 };
                 
                 // Obtenir les 2 premières valeures du stack / deux dernières
@@ -165,7 +167,7 @@ impl Esianolop {
 
                 // Tout les cas ou la destination est à push sur la pile
                 let right_is_destination:bool = (instruction == "dpr") | (instruction ==  ">") | ((instruction == "~") & (!vec_from_down)); 
-                println!("Is right destination ? {}",right_is_destination); // Tempory debug
+                //println!("Is right destination ? {}",right_is_destination); // Tempory debug
 
                 let val = if vec_from_down {
                         let temp = self.values.get(0);
@@ -181,13 +183,17 @@ impl Esianolop {
                         }
                     };
                  
+                let val = match val.clone().execute() {
+                    Ok(e) => e,
+                    Err(e) => return Err(format!("{} in duplicate {} to {}",e,if vec_from_down {"left"} else {"right"},if right_is_destination {"right"} else {"left"}))
+                };
                 if right_is_destination {
                     // push back
-                    self.values.push(EsianolopInstruction::Dup(Box::new(val.clone())));
+                    self.values.push(EsianolopInstruction::Dup(val));
                 } else {
                     // push front
                     let mut tmp = Vec::new();
-                    tmp.push(EsianolopInstruction::Dup(Box::new(val.clone())));
+                    tmp.push(EsianolopInstruction::Dup(val));
                     tmp.extend(self.values.to_owned());
                     self.values = tmp;
                 };
@@ -249,13 +255,13 @@ impl Esianolop {
                         
                         if self.functions.contains_key(ins) { // Si c'est dans la liste des fonctions
                             let x = &self.functions.get(ins).unwrap().clone(); // On prend le code défini par la fonction
-                            println!("executing function {} with {}",ins,x);
+                            println!("Executing function {} with {}",ins,x);
                             return match self.parse_text(x) { // Execute le code de la fonction (marche pour les fonctions récursive donc)
                                 Err(e) => Err(e+" in function "+ins), // Ajout à l'erreur des informations de la trace
                                 Ok(_) => Ok(())
                             } 
                         } else {
-                            return Err("not a valid expression nor function".to_owned()) // Sinon on retourne une erreur
+                            return Err(format!("{} is not a valid expression nor function",ins)) // Sinon on retourne une erreur
                         }
                         
                     }
@@ -318,7 +324,7 @@ impl Esianolop {
                     if (function_name == "") | (function_code.trim() == "") { return Err(format!("trying to define an empty function at {}:{}",line_nb,ins_nb))} 
                     // Si on redéfinie la fonction
                     if self.functions.contains_key(function_name) {return Err(format!("trying to define already-defined function at {}:{}",line_nb,ins_nb))}
-                    // println!("Defing function {} with {}",function_name,function_code.trim());
+                    println!("Defing function {} with {}",function_name,function_code.trim());
 
                     // On saute à la fin de la définition de la fonction, pour la prochaine instruction
                     let skip_count = function_code.matches(' ').count();
@@ -358,7 +364,7 @@ impl Esianolop {
 
                             for _ in 0..nb { // On execute le for
                                 match self.parse_text(function_code.trim()) {
-                                    Err(e) => return Err(format!("{} in for loop at {}:{}",e,line_nb,ins_nb)),
+                                    Err(e) => return Err(format!("{} in for loop at {}:{}",e,line_nb+1,ins_nb+1)),
                                     Ok(_)=> (),
                                 }
                             }
@@ -386,7 +392,11 @@ impl Esianolop {
 
                 // On execute le code, et si il y a une erreur, on l'affiche
                 match self.execute_instruction(vec_from_down, specified, &instruction.to_ascii_lowercase()) {
-                    Err(e) => return Err(format!("Error at {}:{}, {}",line_nb,ins_nb,e)),
+                    
+                    Err(e) => {
+                        
+                        return Err(format!("Error at {}:{}, {{\n\t{}\n}}",line_nb+1,ins_nb+1,e.replace("\n", "\n\t"))) 
+                    },
                     _ => (),
                 };
             }

@@ -1,0 +1,9 @@
+test:1 2 3:
+
+# fonctions qui bouge les arbres de gauche à droite et inversement
+l_to_r:<dpr <del:
+r_to_l:>dpl >del:
+
+
+test
+r_to_l    ; appel de la fonction
