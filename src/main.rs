@@ -1,18 +1,35 @@
+
+// 
+// Bienvenue sur ce magnifique projet de création d'un language en polonaise inversé
+// Le nom viens du mot "polonaise" à l'envers : "esianolop"
+// 
+// Ce projet à été codé en rust: cela permet une plus grande rapidité et sécurité.
+// Il s'utillise en ligne de commande
+// 
+// Si vous avez besoin d'aide avec le code: cyprien.bourotte@gmail.com
+// 
+
+
+// J'importe mes classes
 use esianolop;
+// Importation de env pour les arguments quand utillisé en ligne de commande
 use std::env;
+// Importation de io pour les inputs
 use std::io::{self, Write};
+// Importation de process pour quitter le programme
 use std::process;
+
 
 
 // La fonction qui affiche l'aide
 pub fn help() {
-    println!(r#"Help : Esianolop v1.0b par Cyprien Bourotte
+    println!(r#"Help : Esianolop v1.2b par Cyprien Bourotte
 Commandes :
  - file|f <file>   : Execute le fichier <file>
  - exe|x|e [code]* : Execute le code [code]*
  - help|?          : Affiche l'aide
- - print|p         : Affiche les arbres du compilers
- - reset|r         : Reset les arbres du compilateur
+ - print|p         : Affiche les arbres du compilateur
+ - reset|r         : Reset les arbres du compilateur (pas les fonctions)
  - null|n          : Reset le compilateur
  - quit|q          : Quitte l'invite de commande
     
@@ -22,25 +39,39 @@ Instructions :
  - mul|* : Multiplie les 2 valeurs
  - div|/ : Divise les 2 valeurs
  - pow|^ : Met en puissance les 2 valeurs
+ - sqr|$ : Met en racine la valeure
  - dpL|< : Duplique la valeur et la place devant
  - dpR|> : Duplique la valeur et la place derrière
  - dup|~ : Duplique la valeur et la place à coté
  - del|! : Supprimer la valeur
  - <nb>  : Insère un noeu nombre
 
-Pour chaque instruction vous pouvez spécifiez si elle se fera sur le devant du stack (avec un "<" devant, par défault) ou sur le fond -par défault juste pour les nombres- (avec un ">" devant)
+Pour chaque instruction vous pouvez spécifiez si elle se fera sur le devant du stack (avec un "<" devant, par défault) ou sur le fond (avec un ">" derrière, par défault juste pour les nombres)
 
 Par exemple '2 3 <1' donnera '1 2 3' car le 1 à été inséré au devant du stack, tandis que '1 2 3 >+' donnera '1 Add(2,3)'
-    
+
+Exemples de code:
+ - e 1 2 3 >~       => 1 2 3 3         (duplique la dernière valeur)
+ - e 1 2 3 ~        => 1 1 2 3         (duplique la première valeur)
+ - e 1 2 3 pow add  => Add(Pow(1,2),3)
+ - e 1 2 3 >pow add => Add(1,Pow(2,3))
+ - e 1 2 3 >        => 1 2 3 3        
+ - e 1 2 3 ><       => 3 1 2 3         (duplique la dernière valeur au devant)
+ - e 1 2 3 <>       => 1 2 3 1         (duplique la première valeur derrière)
+ - e 2 3 <1 >!      => 1 2             (on ajoute 1 au début et supprime le 3)
+
+
+Fonctions :
+ - Vous pouvez définir des fonctions en utillisant les ':'. Chaque fonction porte un nom, et est assigné à une série de commandes.
+   Par exemple, taper `e test:1 2 +:` définie une fonction "test" qui executera "1 2 +". Pour l'appeller, vous pouvez taper son nom ("e test test" donnera [4 2])
+ - Certaine fonction sont pré-définie, par exemple la fonction "for" qui execute son code X fois, X étant la valeur dans le stack.
+ - Les fonction ne se reset pas avec la commande `reset`, mais seulement avec la commande `null`.
+
 Exemples :
- - '1 2 3 >~'       => '1 2 3 3' (duplique la dernière valeur)
- - '1 2 3 ~'        => '1 1 2 3' (duplique la première valeur)
- - '1 2 3 pow add'  => 'Add(Pow(1,2),3)'
- - '1 2 3 >pow add' => 'Add(1,Pow(2,3))'
- - '1 2 3 >'        => '1 2 3 3'
- - '1 2 3 ><'       => '3 1 2 3' (duplique la dernière valeur au devant)
- - '1 2 3 <>'       => '1 2 3 1' (duplique la première valeur derrière)
- - 'e 2 3 <1 >!'    => '1 2' (on ajoute 1 au début et supprime le 3)
+ - e one:1: plus:+: 3 one plus => Add(1,3)
+ - e 90 5 for:2 +:             => 100 (répéter 5 fois "2 +" depuis 90)
+ - e 90 5 <for:2 +:            => 185 (répéter 90 fois "2 +" depuis 5)
+ - e t:7:u:+:o:2: t o u        => 9   (7 2 +)
 "#
 )
 }
@@ -103,13 +134,13 @@ fn execute_command(input:Vec<&str>,mut compiler:&mut esianolop::structs::Esianol
     }
 }
 
-// L'invite de commande
-pub fn command_line() {
+// L'invite de commande (ne retourne pas, boucle infinie ou arette le programme)
+pub fn command_line() -> ! {
 
     // Affichage du message d'introduction 
     println!("Esianolop v1.0b, par Cyprien Bourotte.\nType 'help' or '?' to get help.");
     
-    // Création d'une instance d'un compilateur.
+    // Création d'une instance du compilateur.
     let mut compiler = esianolop::structs::Esianolop::new();
 
     loop { // Boucle infinie
@@ -158,6 +189,3 @@ fn main() {
 
 }
 
-
-// Big tests :
-// e test:7:uwu:+:owo:2: test owo uwu

@@ -1,7 +1,8 @@
 use std::fmt;
 use std::fs;
 use std::collections::HashMap;
-use std::convert::TryFrom;
+
+// rust fonctionne avec des structures, non pas des classes, mais tout est pareil (sauf que techniquement parlant, tout est statique en rust)
 
 
 // Définition de la liste des instructions (sans les fonctions, ni les for, ils se font à coté)
@@ -25,6 +26,7 @@ pub enum EsianolopInstruction {
 impl EsianolopInstruction {
 
     // La fonction execute donne le résultat. Elle est récursive car elle appelle ces/son fil(s) pour connaitre sa valeur
+    // Elle est aussi sécurisé. Si une opération rate (exemple: 5-8) elle ne paniquera pas mais arretera le programme
     pub fn execute(&self) -> Result<usize,&str> {
         match self {
             EsianolopInstruction::Nul => {return Ok(0)},
@@ -69,8 +71,8 @@ impl fmt::Display for EsianolopInstruction {
 
 
 // Definition de la structure pour le compilateur
-// avec values    : Stack d'Arbres 
-// et   fonctions : Des bouts de codes stoqué sous des Strings
+// avec    values : Stack d'Arbres 
+// et   fonctions : Des bouts de codes stoqué sous des Strings executes dès que appelé. Un dictionnaire au final.
 pub struct Esianolop {
     pub values:Vec<EsianolopInstruction>,
     pub functions:HashMap::<String,String>,
@@ -116,13 +118,15 @@ impl Esianolop {
             "/" | "div" |
             "^" | "pow" => {
 
+
+                // On obtiens la classe correspondante à notre instruction
                 let operation_fn = match instruction {
                     "+" | "add" => EsianolopInstruction::Add,
                     "-" | "sub" => EsianolopInstruction::Sub,
                     "*" | "mul" => EsianolopInstruction::Mul,
                     "/" | "div" => EsianolopInstruction::Div,
                     "^" | "pow" => EsianolopInstruction::Pow,
-                    _           => unreachable!() // Ne devrai jamais arriver
+                    _           => unreachable!() // Ne devrai jamais arriver, mais si oui, panique le programme (arret brutal)
                 };
                 
                 // Obtenir les 2 premières valeures du stack / deux dernières
@@ -138,7 +142,7 @@ impl Esianolop {
                         }
                     };
                 
-                
+                // Instancier avec les deux valeures
                 let operation = operation_fn(Box::new(vals[0].to_owned()), Box::new(vals[1].to_owned()));
 
                 // Mettre dans le stack
@@ -192,7 +196,7 @@ impl Esianolop {
             },
             // ----- Les opérations qui prennent 1 entrée -----
             "$" | "sqr" => {
-                match vec_from_down {
+                match vec_from_down { // Si on prend la valeure depuis la guache ou droite 
                     false => {
                         let temp = self.values.get(self.values.len()-1);
                         let val = match temp {
@@ -215,10 +219,10 @@ impl Esianolop {
             }
             // ----- Delete -----
             "!" | "del" => {
-                if self.values.len() == 0 {
-                    return Err("no value to remove".to_owned());
+                if self.values.len() == 0 { // Si aucune valeure dans le stack d'arbre
+                    return Err("no value to remove".to_owned()); // Erreur
                 }
-                match vec_from_down {
+                match vec_from_down { // Sinon, retirer la valeur correspondante
                     false => self.values.remove(self.values.len()-1),
                     true => self.values.remove(0),
                 };
@@ -229,14 +233,14 @@ impl Esianolop {
                 match ins.to_owned().parse::<usize>() {
                     Ok(e) => {
 
-                        match (specified,vec_from_down) {
-                            (true,true) => {
+                        match (specified,vec_from_down) { // Par défault, la position d'un nombre est à droite, et pas à gauche, donc on vérifie si la position à été définie
+                            (true,true) => { // Si position définie ET à gauche
                                 let mut tmp = Vec::new();
                                 tmp.push(EsianolopInstruction::Num(e as usize));
                                 tmp.extend(self.values.to_owned());
                                 self.values = tmp;
                             },
-                            (false,_) | (true,false) => {
+                            (false,_) | (true,false) => { // si position pas définie OU position définie et droite
                                 self.values.push(EsianolopInstruction::Num(e as usize))
                             }
                         }
@@ -251,7 +255,7 @@ impl Esianolop {
                                 Ok(_) => Ok(())
                             } 
                         } else {
-                            return Err("not a valid expression nor function".to_owned())
+                            return Err("not a valid expression nor function".to_owned()) // Sinon on retourne une erreur
                         }
                         
                     }
@@ -296,31 +300,35 @@ impl Esianolop {
 
                     //println!("Founded function at {}:{}",line_nb,ins_nb);
 
-                    let mut line_rest = table_iter.clone().map(|(_,y)|y) // take the reset of the line
+                    let mut line_rest = table_iter.clone().map(|(_,y)|y) // on prend le reste de la ligne (derrère l'instruction)
                         .collect::<Vec<&str>>().join(" ").to_owned();
                     
-                    line_rest = instruction.to_owned()+ " "+&line_rest; // adding instruction
+                    line_rest = instruction.to_owned()+ " "+&line_rest; // On rajoute notre instruction à la ligne
                     //println!("Line_rest:{}",line_rest);
                     
-                    let function_name = line_rest.split(":").collect::<Vec<&str>>()[0].trim(); // take the name
-                    let mut function_code = line_rest.split(":").collect::<Vec<&str>>()[1]; // take the rest (function def and rest of the line)
+                    let function_name = line_rest.split(":").collect::<Vec<&str>>()[0].trim(); // On prend le nom de la fonction définie
+                    let mut function_code = line_rest.split(":").collect::<Vec<&str>>()[1]; // On prend le reste (le code dans la fonction ET le reste de la ligne)
                     
 
-                    if function_code.contains(":") { // In case of code behind the function, put a limit
-                        function_code = function_code.split(":").collect::<Vec<&str>>()[0];
+                    if function_code.contains(":") { // En cas de continuation du code derrière la fonction
+                        function_code = function_code.split(":").collect::<Vec<&str>>()[0]; // On le retire du code de la fonction
                     };
 
+                    // Si le nom / code de la fonction est vide
                     if (function_name == "") | (function_code.trim() == "") { return Err(format!("trying to define an empty function at {}:{}",line_nb,ins_nb))} 
+                    // Si on redéfinie la fonction
                     if self.functions.contains_key(function_name) {return Err(format!("trying to define already-defined function at {}:{}",line_nb,ins_nb))}
                     // println!("Defing function {} with {}",function_name,function_code.trim());
 
-                    // Skiping to the end of the function
+                    // On saute à la fin de la définition de la fonction, pour la prochaine instruction
                     let skip_count = function_code.matches(' ').count();
                     if skip_count == 0{
+                        // Si il y a pas d'espaces, on reste sur l'instrcution actuelle, mais retire la définition de la fonction
                         in_function = false;
                         temp_lifetime_instruction = instruction.split(":").map(|x|x.to_owned()).collect::<Vec<String>>().get(2..).unwrap().join(":");
                         active_instruction = Some((ins_nb, &temp_lifetime_instruction));
                     } else {
+                        // Sinon on saute et coupe le fin de définition
                         active_instruction =table_iter.nth(skip_count-1);
                         let (pos,ins) = match active_instruction {
                             None  => {return Err(format!("Jump to function end failed at {}:{}",line_nb,ins_nb))},
@@ -331,33 +339,33 @@ impl Esianolop {
                     }
 
                     match function_name {
-                        // If define a function named for => if doing a for, called the code x times
+                        // Si on définie une fonction avec le nom "for", on execute le code spécial for
                         "for" | "<for" | ">for" => {
 
-                            // If no number for the loop
+                            // si il n'y a pas de valeurs pour executer la boucle
                             if self.values.len() == 0 {
                                 return Err(format!("Aptended a for with nothing in the stack at {}:{}",line_nb,ins_nb))
                             }
 
-                            // get the Index of the position of the number for the loop
-                            let index = if &function_name[0..0] == "<" {0} else {self.values.len()-1};
+                            // On prend le premier charactère du for, pour savoir si c'est < ou pas
+                            let index = if &function_name[0..1] == "<" {0} else {self.values.len()-1};
                             let nb = match self.values[index].execute() {
                                 Ok(e) => e,
                                 Err(e) => return Err(format!("{} in accesing number of for loop at {}:{}",e,line_nb,ins_nb))
-                            }; // Get the number of loops
+                            }; // On récupère le nombre de boucle 
 
-                            self.values.remove(index); // Remove it
+                            self.values.remove(index); // On retire le nombre d'execution
 
-                            for _ in 0..nb { // Do the for
+                            for _ in 0..nb { // On execute le for
                                 match self.parse_text(function_code.trim()) {
                                     Err(e) => return Err(format!("{} in for loop at {}:{}",e,line_nb,ins_nb)),
                                     Ok(_)=> (),
                                 }
                             }
                         }
-                        // Else, define function
+                        // Sinon, on créé la fonction
                         _ => {
-                            self.functions.insert(function_name.to_owned(), function_code.trim().to_owned()); // Ajouter la fonction à la hashmap
+                            self.functions.insert(function_name.to_owned(), function_code.trim().to_owned()); // Ajouter la fonction à la hashmap de fonctions
                             //println!("Defined !");
                         }
                     };
@@ -376,6 +384,7 @@ impl Esianolop {
                     specified = true; // Utile pour les nombres, car par défault on l'ajoute à droite du stack
                 }
 
+                // On execute le code, et si il y a une erreur, on l'affiche
                 match self.execute_instruction(vec_from_down, specified, &instruction.to_ascii_lowercase()) {
                     Err(e) => return Err(format!("Error at {}:{}, {}",line_nb,ins_nb,e)),
                     _ => (),
