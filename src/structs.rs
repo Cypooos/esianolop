@@ -90,13 +90,22 @@ impl Esianolop {
         }
     }
 
+    // reset les valeures
+    pub fn clear(&mut self) {
+        self.values.clear();
+        self.functions.clear();
+    }
+
     // Execute un fichier. Retourne soit Err(message d'erreur) ou Ok(())
     pub fn parse_file(&mut self,filename:&str) -> Result<(),String> {
 
         match fs::read_to_string(filename.to_owned()) { // Est-ce que le ficher à pu etre lu ?
 
             // Si oui, appelle de self.parse_text() avec le contenu du fichier et on retourne (car self.parse_text() à la même signiature)
-            Ok(e) => {return self.parse_text(&e)}, 
+            Ok(e) => {
+                self.clear();
+                return self.parse_text(&e)
+            }, 
             // Si non, on retourne une erreur
             Err(e)=> {return Err(format!("Error while parsing the file: {}",e))}, 
         }

@@ -108,7 +108,7 @@ fn execute_command(input:Vec<&str>,mut compiler:&mut esianolop::structs::Esianol
         "p" | "print" => println!("{:?} => {:?}",compiler.values,compiler.get_result()), // On affiche le stack / le stack compilé
         "n" | "null" => {
             // Reset tout l'interpreteur (fonctions aussi)
-            *compiler = esianolop::structs::Esianolop::new();
+            compiler.clear();
             println!("Interpréteur reset.");
         }, 
         "e" | "exe" | "x" => { 

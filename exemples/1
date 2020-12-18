@@ -13,4 +13,4 @@ r_to_l:>dpl >del:  ; droite à gauche
 next:<~ >~ l_to_r >+ <~ >~ r_to_l <+: 
 
 
-1 1 50 for:next:
+1 1 40 for:next:
