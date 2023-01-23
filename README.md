@@ -1,2 +1,2 @@
 # esianolop
-A nice computer machine for a class project
+A rust-based programming language made in senior year of high school.
