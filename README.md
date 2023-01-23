@@ -1,2 +1,2 @@
 # esianolop
-A rust-based programming language made in senior year of high school.
+A stack-based programming language made in senior year of high school in rust.
